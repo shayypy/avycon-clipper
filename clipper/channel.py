@@ -32,3 +32,7 @@ class Channel:
 
     def __repr__(self) -> str:
         return f"<Channel id={self.id!r} alias={self.alias!r} name={self.name!r} >"
+
+    @property
+    def hls_live_path(self) -> str:
+        return f"/hls/live/{self.id}/1/livetop.mp4"

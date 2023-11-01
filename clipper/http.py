@@ -1,12 +1,12 @@
 from __future__ import annotations
-import base64
+
 import datetime
 import hashlib
 
 import json as j
 import re
 import secrets
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import aiohttp
 
 from .error import AvyconAPIException
@@ -14,6 +14,7 @@ from .error import AvyconAPIException
 if TYPE_CHECKING:
     from .types.api import SuccessResponse
     from .types.channel import GetChannelInfo
+    from .types.playback import GetPlaybackUrl, GetPrivateKey, SearchRecord
 
 __all__ = ("HTTP",)
 
@@ -68,7 +69,7 @@ class HTTP:
         ha1 = hashlib.md5(b(f"{username}:{realm}:{password}")).hexdigest()
         ha2 = hashlib.md5(
             b(
-                f"POST:{uri}:{hashlib.md5(bad_response_body).hexdigest()}"
+                f"POST:{uri}:{hashlib.md5(b(bad_response_body)).hexdigest()}"
                 if qop == "auth-int"
                 else f"POST:{uri}"
             )
@@ -113,7 +114,9 @@ class HTTP:
         self.nonce_count += 1
         self.username = username
         self.password = password
-        self.cookie = response.cookies.get("session").value
+        cookie = response.cookies.get("session")
+        if cookie:
+            self.cookie = cookie.value
         self.csrf_token = response.headers.get("X-csrftoken")
         return j.loads(text)
 
@@ -123,8 +126,8 @@ class HTTP:
         path: str,
         *,
         headers: Optional[Dict[str, str]] = None,
-        json: Optional[Dict[str, str]] = None,
-    ) -> SuccessResponse:
+        json: Optional[Dict[str, Any]] = None,
+    ) -> Any:
         if not self.session:
             raise ValueError("Missing session, call `.init` first.")
 
@@ -154,27 +157,28 @@ class HTTP:
                 now_query(): "",
             }
         )
-        data = await response.text()
+        if response.content_type == "application/json":
+            data = await response.json()
+        else:
+            data = response._body
+
         if not response.ok:
-            raise AvyconAPIException(response, j.loads(data))
+            raise AvyconAPIException(response, data)
 
-        if response.content_type != "application/json":
-            raise ValueError("Unexpected content type", response.content_type)
+        return data
 
-        return j.loads(data)
-
-    async def logout(self):
+    async def logout(self) -> SuccessResponse:
         return await self.request(
-            "POST", f"/API/Web/Logout?{now_query()}",
+            "POST", "/API/Web/Logout",
             json={
                 "data": {},
                 "version": "1.0",
             },
         )
 
-    async def create_heartbeat(self):
+    async def create_heartbeat(self) -> SuccessResponse:
         return await self.request(
-            "POST", f"/API/Login/Heartbeat?{now_query()}",
+            "POST", "/API/Login/Heartbeat",
             json={
                 "actionType": "create",
                 "data": {},
@@ -184,6 +188,48 @@ class HTTP:
 
     async def get_channel_info(self) -> GetChannelInfo:
         data = await self.request(
-            "POST", f"/API/Login/ChannelInfo/Get?{now_query()}"
+            "POST", "/API/Login/ChannelInfo/Get"
+        )
+        return data["data"]
+
+    async def search_records(
+        self,
+        channel_ids: List[str],
+        *,
+        start: datetime.datetime,
+        end: datetime.datetime,
+    ) -> List[SearchRecord]:
+        data = await self.request(
+            "POST", "/API/Playback/SearchRecord/Search",
+            json={
+                "version": "1.0",
+                "data": {
+                    "channel": channel_ids,
+                    "enable_smart_search": 0,
+                    # "record_type": 262145,  # normal, manual
+                    "record_type": 1,  # normal
+                    "smart_region": [],
+                    "stream_mode": "Substream",
+                    "start_date": start.strftime("%m/%d/%Y"),
+                    "start_time": start.strftime("%H:%M:%S"),
+                    "end_date": end.strftime("%m/%d/%Y"),
+                    "end_time": end.strftime("%H:%M:%S"),
+                },
+            },
+        )
+        return data["data"]["record"][0]
+
+    async def get_private_key(self) -> GetPrivateKey:
+        return await self.request(
+            "POST", "/API/Web/Get_Private_Key",
+            json={
+                "number": 1,
+            }
+        )
+
+    async def get_playback_url(self) -> GetPlaybackUrl:
+        now = int(datetime.datetime.now().timestamp() * 1000)
+        data = await self.request(
+            "POST", f"/API/GetDashPlaybackUrl?{now}="
         )
         return data["data"]

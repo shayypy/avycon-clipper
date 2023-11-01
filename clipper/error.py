@@ -13,5 +13,5 @@ class AvyconAPIException(Exception):
     def __init__(self, response: aiohttp.ClientResponse, data: BadResponse) -> None:
         self.response = response
         self.data = data
-        self.message = error_code_map.get(data["error_code"]) if data.get("error_code") else None
+        self.message = error_code_map.get(data["error_code"]) if "error_code" in data else None
         super().__init__(f"[{response.status}]: {self.message} ({data})")
