@@ -16,7 +16,9 @@ CLIP_DIRECTORY="/home/user/clips"
 CLIP_SECONDS="120"
 ```
 
-You should create a new user for this program with the "Remote Login" permission, as well as the "Playback" permission for the camera you selected. It should _not_ be an admin user. Clips are saved without audio, so the Audio permission is not needed.
+You should create a new user for this program with the "Remote Login" permission, as well as the "Playback" permission for the camera you selected. It should _not_ be an admin user. Clips are saved without audio, so the Audio permission is not needed. Your policy for this user should look like this:
+
+![image](https://github.com/shayypy/avycon-clipper/assets/43248357/efb55ba7-40c8-41c5-a772-62dbe0c04daf)
 
 ## Usage
 
